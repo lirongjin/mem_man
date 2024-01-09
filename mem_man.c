@@ -20,17 +20,15 @@
 int MMInit(MemMan *memMan, uint8_t *buf, unsigned int size)
 {
     unsigned int remain = 0;
-    int error = 0;
+    int error1, error2;
 
-    error = LCMInit(&memMan->lcm, buf, size, &remain);
-    if (error != -ENOERR)
-        return error;
-    if (remain > 0) {
-        error = DCMInit(&memMan->dcm, &buf[size-remain], remain);
-        if (error != -ENOERR)
-            return error;
-    }
-    return error;
+    error1 = LCMInit(&memMan->lcm, buf, size, &remain);
+    error2 = DCMInit(&memMan->dcm, &buf[size-remain], remain);
+    if (error1 == -ENOERR &&
+            error2 == -ENOERR)
+        return 0;
+    else
+        return -EINVAL;
 }
 
 /*
@@ -65,13 +63,13 @@ void MMFree(MemMan *memMan, void *pointer)
 void MMExample(void)
 {
     MemMan man;
-    uint8_t buf[20480];
+    uint8_t buf[36];
     void *p;
 
     MMInit(&man, buf, sizeof (buf));
-    p = MMAlloc(&man, 12);
+    p = MMAlloc(&man, 19);
     printf("p: %p\n", p);
-    MMFree(&man, p);
+    //MMFree(&man, p);
+    LCMPrint(&man.lcm);
     DCMPrint(&man.dcm);
 }
-

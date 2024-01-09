@@ -23,7 +23,7 @@ typedef struct {
     unsigned int memSize;           /*动态内存管理堆区大小。*/
 } DynamicCtnMan;
 
-int DCMInit(DynamicCtnMan *dcm, uint8_t *buffer, uint32_t bufLen);
+int DCMInit(DynamicCtnMan *dcm, uint8_t *buffer, size_t bufLen);
 void *DCMAlloc(DynamicCtnMan *dcm, size_t size);
 void DCMFree(DynamicCtnMan *dcm, void *pointer);
 

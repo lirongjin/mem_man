@@ -1,0 +1,84 @@
+mm_alloc(mm, size)
+{
+    container = mm.select_ctn(size);
+    for (; container != null; container = container.next()) {
+        p = container.alloc(size);
+        if (p) {
+            return p;
+        }
+    }
+    return null;
+}
+
+container_alloc(container, size)
+{
+    for (chunk = container.head(); chunk != null; chunk = chunk.next()) {
+        if (chunk.hole_size() >= size) {
+            p = chunk.alloc(size);
+            return p;
+        }
+    }
+    return null;
+}
+
+chunk_alloc(chunk, size)
+{
+    p = chunk.get_pointer();
+    if (chunk.is_split(size)) {
+        chunk.splite(size);
+        return p;
+    } else {
+        chunk.del();
+    }
+    return p;
+}
+
+chunk_split(chunk, size)
+{
+    remain_chunk = chunk.reserve(size);
+    chunk.mm.add_chunk(remain_chunk);
+    chunk.del();
+}
+
+chunk_del(chunk)
+{
+    chunk.prev.next = chunk.next;
+    chunk.next.prev = chunk.prev;
+}
+
+mm_free(pointer)
+{
+    chunk = pointer.to_chunk();
+    if (chunk.lnb.is_free()) {
+        chunk.lnb.del();
+        chunk.add(chunk.lnb);
+    }
+    if (chunk.rnb.is_free()) {
+        chunk.rnb.del();
+        chunk.add(chunk.rnb);
+    }
+    mm.add_chunk(chunk);
+}
+
+mm_add_chunk(mm, chunk)
+{
+    container = mm.select_ctn(chunk);
+    container.add_chunk(chunk);
+}
+
+container_add_chunk(container, chunk)
+{
+    head = container.head();
+    head.next.prev = chunk.node;
+    chunk.node.next = head.next;
+    head.next = chunk.node;
+    chunk.prev = head;
+}
+
+mm_init(mm, buffer)
+{
+    chunk = mm_transfer(buffer);
+    mm_add_chunk(chunk);
+}
+
+

@@ -1,0 +1,50 @@
+mm_alloc(mm, size)
+{
+    container = mm.select_ctn(size);
+    pointer = container.alloc();
+    return pointer;
+}
+
+container_alloc(container)
+{
+    if (container.no_empty()) {
+        meta = container.get_free_meta;
+        chunk = container.get_chunk(meta);
+        meta.set_used();
+        return chunk.pointer();
+    } else {
+        return null;
+    }
+}
+
+mm_free(mm, pointer)
+{
+    container = mm.get_container(pointer);
+    container.free(pointer);
+}
+
+container_free(container, pointer)
+{
+    meta = container.get_meta(pointer);
+    meta.set_free();
+}
+
+mm_init(mm, bufferr)
+{
+    container = mm.head();
+    for (; container != null; container = container->next()) {
+        remain = container_init(container, buffer);
+        buffer.reduce(remain);
+    }
+}
+
+container_init(container, buffer)
+{
+    used_size = min(container.chunk_count * container.chunk_size, buffer.size);
+    container.chunk_count = used_size / container.chunk_size;
+    for (i = 0; i < container.chunk_count; i++) {
+        chunk[i].meta.set_free();
+    }
+    return buffer.size - used_size;
+}
+
