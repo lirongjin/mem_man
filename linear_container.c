@@ -89,7 +89,8 @@ static void LCMContainerInit(LCMLinearContainer *container, uint8_t *buf, size_t
 
     if (!buf || !pRemain || bufSize < META_GAP_SIZE * 4 + MEM_MAN_ALIGN_SIZE
             || container->unitCount == 0
-            || container->unitSize == 0) {
+            || container->unitSize == 0
+            || container->unitSize % 8 != 0) {
         goto err0;
     }
 
@@ -258,28 +259,6 @@ void LCMFree(LinearContainerMan *lcm, void *pointer)
     if (error != -ENOERR)
         return;
     LCMContainerFree(&lcm->containers[ctnId], pointer);
-}
-
-/*
- * 功能：初始化容器的内存单元尺寸和内存单元数量
- * 返回值：
- */
-static void LCMContainerInitUnit(LCMLinearContainer *container, size_t pos)
-{
-    switch (pos) {
-    case 0:
-        container->unitSize = CONTAINER0_UNIT_SIZE;
-        container->unitCount = CONTAINER0_UNIT_COUNT;
-        break;
-    case 1:
-        container->unitSize = CONTAINER1_UNIT_SIZE;
-        container->unitCount = CONTAINER1_UNIT_COUNT;
-        break;
-    case 2:
-        container->unitSize = CONTAINER2_UNIT_SIZE;
-        container->unitCount = CONTAINER2_UNIT_COUNT;
-        break;
-    }
 }
 
 /*

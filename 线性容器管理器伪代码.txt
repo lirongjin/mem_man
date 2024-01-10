@@ -1,11 +1,11 @@
-mm_alloc(mm, size)
+lcm_alloc(lcm, size)
 {
-    container = mm.select_ctn(size);
+    container = lcm.select_ctn(size);
     pointer = container.alloc();
     return pointer;
 }
 
-container_alloc(container)
+container::alloc(container)
 {
     if (container.no_empty()) {
         meta = container.get_free_meta;
@@ -17,28 +17,28 @@ container_alloc(container)
     }
 }
 
-mm_free(mm, pointer)
+lcm_free(lcm, pointer)
 {
-    container = mm.get_container(pointer);
+    container = lcm.get_container(pointer);
     container.free(pointer);
 }
 
-container_free(container, pointer)
+container::free(container, pointer)
 {
     meta = container.get_meta(pointer);
     meta.set_free();
 }
 
-mm_init(mm, bufferr)
+lcm_init(lcm, bufferr)
 {
-    container = mm.head();
+    container = lcm.head();
     for (; container != null; container = container->next()) {
         remain = container_init(container, buffer);
         buffer.reduce(remain);
     }
 }
 
-container_init(container, buffer)
+container::init(container, buffer)
 {
     used_size = min(container.chunk_count * container.chunk_size, buffer.size);
     container.chunk_count = used_size / container.chunk_size;

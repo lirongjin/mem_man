@@ -14,7 +14,9 @@
 #include "errno.h"
 #include "cpl_debug.h"
 
-#define DCM_DEBUG
+//#define DCM_DEBUG
+//#define DCM_CHECKSUM
+
 #ifdef DCM_DEBUG
 #define PrDbg(...)          Pr("", __LINE__, __FUNCTION__, "debug", __VA_ARGS__)
 #else
@@ -84,7 +86,7 @@
 /*右边相邻块的左边界标记*/
 #define CHUNK_RNB_LMARKER(chunk_base)                   ((DCMBoundaryMarker *)((uint8_t *)(chunk_base) + BASE_TO_LMARKER(chunk_base)->chunkSize))
 
-#define CHUNK_CS_INIT_VAL                               (0x5AA5)
+#define CHUNK_CS_DEFAULT_VAL                               (0x5AA5)
 
 /*边界标记，用于管理一个块。*/
 typedef struct {
@@ -93,7 +95,7 @@ typedef struct {
     uint32_t chunkSize;         /*块大小。*/
 } DCMBoundaryMarker;
 
-#ifdef DCM_DEBUG
+#ifdef DCM_CHECKSUM
 /*
  * 功能：生成buffer区的校验和
  * 返回值：
@@ -164,7 +166,7 @@ static inline char DCMChunkIsFree(DynamicCtnMan *dcm, uint8_t *chunkBase)
 
         leftMarker = BASE_TO_LMARKER(chunkBase);
         rightMarker = BASE_TO_RMARKER(chunkBase);
-#ifdef DCM_DEBUG
+#ifdef DCM_CHECKSUM
 
         checksum = DCMGenChecksum(CHUNK_CS_DATA_ADDR(chunkBase), CHUNK_CS_DATA_LEN(chunkBase));
         if (leftMarker->checksum == rightMarker->checksum
@@ -179,7 +181,7 @@ static inline char DCMChunkIsFree(DynamicCtnMan *dcm, uint8_t *chunkBase)
 #else
         (void)checksum;
         if (leftMarker->checksum == rightMarker->checksum
-                && leftMarker->checksum == CHUNK_CS_INIT_VAL) {
+                && leftMarker->checksum == CHUNK_CS_DEFAULT_VAL) {
             return leftMarker->used == 0;
         } else {
             return 0;
@@ -219,28 +221,50 @@ static DCMContainer * DCMSelectChunkContainer(DynamicCtnMan *dcm, size_t chunkSi
 }
 
 /*
+ * 功能：判断两个块是否在同一个容器中。
+ * 返回值：如果两个块是否在同一个容器中返回1，否则返回0。
+ **/
+static char DCMChunksIsInOneContainer(DynamicCtnMan *dcm, uint8_t *lChunk, uint8_t *rChunk)
+{
+    size_t lChunkSize, rChunkSize;
+
+    if (!DCMAddressIsValid(dcm, lChunk)
+            || !DCMChunkIsValid(dcm, lChunk))
+        return 0;
+    if (!DCMAddressIsValid(dcm, rChunk)
+            || !DCMChunkIsValid(dcm, rChunk))
+        return 0;
+
+    lChunkSize = BASE_TO_LMARKER(lChunk)->chunkSize;
+    rChunkSize = BASE_TO_LMARKER(rChunk)->chunkSize;
+    return DCMSelectChunkContainer(dcm, lChunkSize) == DCMSelectChunkContainer(dcm, rChunkSize);
+}
+
+/*
  * 功能：根据块的前向链接指针寻找块的下一个有效节点，用于绕过坏块
  * 返回值：
  **/
-static void *DCMSearchNextValidNode(DynamicCtnMan *dcm, DCMContainer *container, void *starNode)
+static void *DCMSearchNextValidNode(DynamicCtnMan *dcm, DCMContainer *container, void *startNode)
 {
     void *iterNode, *validNode;
 
     if (DCMContainerIsEmpty(container))
         return CONTAINER_NODE(container);
 
-    validNode = starNode;
-    if (CONTAINER_NODE(container) == starNode) {
+    validNode = startNode;
+    if (CONTAINER_NODE(container) == startNode) {
         iterNode = container->prev;
     } else {
-        iterNode = CHUNK_GET_PREV_NODE(NODE_TO_CHUNK(starNode));
+        iterNode = CHUNK_GET_PREV_NODE(NODE_TO_CHUNK(startNode));
     }
-    for (; iterNode != starNode; ) {
+    for (; iterNode != startNode; ) {
         if (CONTAINER_NODE(container) == iterNode) {
             validNode = iterNode;
             iterNode = container->prev;
         }  else {
-            if (DCMChunkIsFree(dcm, NODE_TO_CHUNK(iterNode))) {
+            /*判断迭代节点和起始节点是否在同一容器中，如果内存内容被非法修改（极端情况），也能退出循环。*/
+            if (DCMChunkIsFree(dcm, NODE_TO_CHUNK(iterNode))
+                    && DCMChunksIsInOneContainer(dcm, NODE_TO_CHUNK(startNode), NODE_TO_CHUNK(iterNode))) {
                 validNode = iterNode;
                 iterNode = CHUNK_GET_PREV_NODE(NODE_TO_CHUNK(iterNode));
             } else {
@@ -273,7 +297,9 @@ static void *DCMSearchPrevValidNode(DynamicCtnMan *dcm, DCMContainer *container,
             validNode = iterNode;
             iterNode = container->next;
         }  else {
-            if (DCMChunkIsFree(dcm, NODE_TO_CHUNK(iterNode))) {
+            /*判断迭代节点和起始节点是否在同一容器中，如果内存内容被非法修改（极端情况），也能退出循环。*/
+            if (DCMChunkIsFree(dcm, NODE_TO_CHUNK(iterNode))
+                    && DCMChunksIsInOneContainer(dcm, NODE_TO_CHUNK(startNode), NODE_TO_CHUNK(iterNode))) {
                 validNode = iterNode;
                 iterNode = CHUNK_GET_NEXT_NODE(NODE_TO_CHUNK(iterNode));
             } else {
@@ -356,12 +382,12 @@ static void DCMAddChunk(DynamicCtnMan *dcm, uint8_t *chunkBase, size_t chunkSize
     /*根据块的窗口尺寸选择合适的容器并将其添加到容器首部。*/
     container = DCMSelectChunkContainer(dcm, chunkSize);
     DCMContainerAddChunk(dcm, container, chunkBase);
-#ifdef DCM_DEBUG
+#ifdef DCM_CHECKSUM
     leftMarker->checksum = DCMGenChecksum(CHUNK_CS_DATA_ADDR(chunkBase), CHUNK_CS_DATA_LEN(chunkBase));
     rightMarker->checksum = leftMarker->checksum;
 #else
-    leftMarker->checksum = CHUNK_CS_INIT_VAL;
-    rightMarker->checksum = CHUNK_CS_INIT_VAL;
+    leftMarker->checksum = CHUNK_CS_DEFAULT_VAL;
+    rightMarker->checksum = CHUNK_CS_DEFAULT_VAL;
 #endif
 }
 

@@ -1,6 +1,6 @@
-mm_alloc(mm, size)
+dcm_alloc(dcm, size)
 {
-    container = mm.select_ctn(size);
+    container = dcm.select_ctn(size);
     for (; container != null; container = container.next()) {
         p = container.alloc(size);
         if (p) {
@@ -10,7 +10,7 @@ mm_alloc(mm, size)
     return null;
 }
 
-container_alloc(container, size)
+container::alloc(container, size)
 {
     for (chunk = container.head(); chunk != null; chunk = chunk.next()) {
         if (chunk.hole_size() >= size) {
@@ -21,7 +21,7 @@ container_alloc(container, size)
     return null;
 }
 
-chunk_alloc(chunk, size)
+chunk::alloc(chunk, size)
 {
     p = chunk.get_pointer();
     if (chunk.is_split(size)) {
@@ -33,20 +33,20 @@ chunk_alloc(chunk, size)
     return p;
 }
 
-chunk_split(chunk, size)
+chunk::split(chunk, size)
 {
     remain_chunk = chunk.reserve(size);
-    chunk.mm.add_chunk(remain_chunk);
+    chunk.dcm.add_chunk(remain_chunk);
     chunk.del();
 }
 
-chunk_del(chunk)
+chunk::del(chunk)
 {
     chunk.prev.next = chunk.next;
     chunk.next.prev = chunk.prev;
 }
 
-mm_free(pointer)
+dcm_free(pointer)
 {
     chunk = pointer.to_chunk();
     if (chunk.lnb.is_free()) {
@@ -57,16 +57,16 @@ mm_free(pointer)
         chunk.rnb.del();
         chunk.add(chunk.rnb);
     }
-    mm.add_chunk(chunk);
+    dcm.add_chunk(chunk);
 }
 
-mm_add_chunk(mm, chunk)
+dcm::add_chunk(dcm, chunk)
 {
-    container = mm.select_ctn(chunk);
+    container = dcm.select_ctn(chunk);
     container.add_chunk(chunk);
 }
 
-container_add_chunk(container, chunk)
+container::add_chunk(container, chunk)
 {
     head = container.head();
     head.next.prev = chunk.node;
@@ -75,10 +75,10 @@ container_add_chunk(container, chunk)
     chunk.prev = head;
 }
 
-mm_init(mm, buffer)
+dcm_init(dcm, buffer)
 {
-    chunk = mm_transfer(buffer);
-    mm_add_chunk(chunk);
+    chunk = dcm_transfer(buffer);
+    dcm_add_chunk(chunk);
 }
 
 
